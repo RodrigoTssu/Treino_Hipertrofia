@@ -225,24 +225,46 @@
     margin: 0 0 10px 0;
   }
 
-  /* Sets Table */
-  .sets-grid {
+  /* Sets Tabs (R / D) */
+  .rd-tabs {
     display: flex;
-    flex-direction: column;
     gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .rd-tab {
+    flex: 1;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .rd-tab.active {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: #93c5fd;
+  }
+
+  .set-panel {
+    display: none;
+  }
+
+  .set-panel.active {
+    display: block;
   }
 
   .set-row {
     display: grid;
-    grid-template-columns: 52px 1fr 1fr 38px;
+    grid-template-columns: 1fr 1fr 38px;
     gap: 6px;
     align-items: center;
-  }
-
-  .set-label {
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: var(--muted);
   }
 
   .input-wrap {
@@ -257,8 +279,8 @@
     border: 1px solid var(--border);
     color: var(--text);
     border-radius: 8px;
-    padding: 7px 28px 7px 9px;
-    font-size: 0.88rem;
+    padding: 8px 30px 8px 10px;
+    font-size: 0.9rem;
     font-weight: 600;
     outline: none;
   }
@@ -276,7 +298,7 @@
   }
 
   .check-btn {
-    height: 34px;
+    height: 36px;
     width: 38px;
     border-radius: 8px;
     border: 1px solid var(--border);
@@ -568,17 +590,22 @@ const WEEKLY_SUMMARY = [
   { group: "Abdômen", sets: "6 séries diretas", detail: "Seg e Sex + estabilização geral" }
 ];
 
-const STORAGE_KEY = "hipertrofia_5d_state_v2";
+const STORAGE_KEY = "hipertrofia_5d_state_v3";
 let state = loadState();
 
 function loadState() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem("hipertrofia_5d_state_v2");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (!parsed.activeSubTab) parsed.activeSubTab = {};
+      return parsed;
+    }
   } catch (e) {}
   return {
     activeDay: "seg",
     trim60: false,
+    activeSubTab: {},
     weights: {},
     history: []
   };
@@ -594,6 +621,13 @@ function showToast(msg) {
   el.style.display = "block";
   clearTimeout(window._toastTimer);
   window._toastTimer = setTimeout(() => { el.style.display = "none"; }, 2200);
+}
+
+function setTopMode(mode) {
+  if (mode === "workout") {
+    closeModal("summaryModal");
+    closeModal("historyModal");
+  }
 }
 
 function renderTopPills() {
@@ -620,34 +654,58 @@ function toggleTrimMode() {
   showToast(state.trim60 ? "Modo 60 min ativado (-1 série nos acessórios)" : "Volume padrão restaurado");
 }
 
-function getSetData(exId, setIdx) {
+function getSetData(exId, slotIdx) {
   if (!state.weights[exId]) state.weights[exId] = [];
-  if (!state.weights[exId][setIdx]) state.weights[exId][setIdx] = { kg: "", reps: "", done: false };
-  return state.weights[exId][setIdx];
+  if (!state.weights[exId][slotIdx]) state.weights[exId][slotIdx] = { kg: "", reps: "", done: false };
+  return state.weights[exId][slotIdx];
 }
 
-function updateSet(exId, setIdx, field, value) {
-  const item = getSetData(exId, setIdx);
+function checkReadyToProgress(ex) {
+  const rData = getSetData(ex.id, 0);
+  const dData = getSetData(ex.id, 1);
+  const r1 = parseInt(rData.reps, 10);
+  const r2 = parseInt(dData.reps, 10);
+  return !isNaN(r1) && !isNaN(r2) && r1 >= ex.maxReps && r2 >= ex.maxReps;
+}
+
+function updateProgressBadge(ex) {
+  const badgeEl = document.getElementById(`prog_${ex.id}`);
+  if (!badgeEl) return;
+  badgeEl.style.display = checkReadyToProgress(ex) ? "inline-block" : "none";
+}
+
+function updateSet(exId, slotIdx, field, value) {
+  const item = getSetData(exId, slotIdx);
   item[field] = value;
   saveState();
-  if (field === "reps") renderExercises();
+  if (field === "reps") {
+    const day = WORKOUT_DATA[state.activeDay];
+    const ex = day.exercises.find(e => e.id === exId);
+    if (ex) updateProgressBadge(ex);
+  }
 }
 
-function toggleDone(exId, setIdx) {
-  const item = getSetData(exId, setIdx);
+function toggleDone(exId, slotIdx) {
+  const item = getSetData(exId, slotIdx);
   item.done = !item.done;
   saveState();
-  renderExercises();
+  const btn = document.getElementById(`chk_${exId}_${slotIdx}`);
+  if (btn) {
+    btn.classList.toggle("done", item.done);
+  }
 }
 
-function checkReadyToProgress(ex, totalSets) {
-  let filled = 0;
-  for (let i = 0; i < totalSets; i++) {
-    const d = getSetData(ex.id, i);
-    const r = parseInt(d.reps, 10);
-    if (!isNaN(r) && r >= ex.maxReps) filled++;
-  }
-  return filled === totalSets && totalSets > 0;
+function switchSubTab(exId, slotIdx) {
+  if (!state.activeSubTab) state.activeSubTab = {};
+  state.activeSubTab[exId] = slotIdx;
+  saveState();
+
+  [0, 1].forEach(idx => {
+    const tabBtn = document.getElementById(`tab_${exId}_${idx}`);
+    const panel = document.getElementById(`panel_${exId}_${idx}`);
+    if (tabBtn) tabBtn.classList.toggle("active", idx === slotIdx);
+    if (panel) panel.classList.toggle("active", idx === slotIdx);
+  });
 }
 
 function renderExercises() {
@@ -664,31 +722,49 @@ function renderExercises() {
 
   day.exercises.forEach(ex => {
     const effectiveSets = (state.trim60 && ex.trimmable) ? Math.max(2, ex.sets - 1) : ex.sets;
-    const canProgress = checkReadyToProgress(ex, effectiveSets);
+    const canProgress = checkReadyToProgress(ex);
+    const activeSlot = (state.activeSubTab && typeof state.activeSubTab[ex.id] === "number")
+      ? state.activeSubTab[ex.id]
+      : 0;
 
     const card = document.createElement("div");
     card.className = "exercise-card";
 
-    let setsHtml = "";
-    for (let i = 0; i < effectiveSets; i++) {
-      const s = getSetData(ex.id, i);
-      setsHtml += `
-        <div class="set-row">
-          <div class="set-label">Série ${i + 1}</div>
-          <div class="input-wrap">
-            <input type="number" inputmode="decimal" step="0.5" placeholder="0" value="${s.kg}"
-              onchange="updateSet('${ex.id}', ${i}, 'kg', this.value)" />
-            <span class="input-unit">kg</span>
+    const slots = [
+      { idx: 0, label: "R" },
+      { idx: 1, label: "D" }
+    ];
+
+    const tabsHtml = slots.map(slot => `
+      <button type="button"
+        id="tab_${ex.id}_${slot.idx}"
+        class="rd-tab ${activeSlot === slot.idx ? "active" : ""}"
+        onclick="switchSubTab('${ex.id}', ${slot.idx})">${slot.label}</button>
+    `).join("");
+
+    const panelsHtml = slots.map(slot => {
+      const s = getSetData(ex.id, slot.idx);
+      return `
+        <div id="panel_${ex.id}_${slot.idx}" class="set-panel ${activeSlot === slot.idx ? "active" : ""}">
+          <div class="set-row">
+            <div class="input-wrap">
+              <input type="number" inputmode="decimal" step="0.5" placeholder="0" value="${s.kg}"
+                oninput="updateSet('${ex.id}', ${slot.idx}, 'kg', this.value)" />
+              <span class="input-unit">kg</span>
+            </div>
+            <div class="input-wrap">
+              <input type="number" inputmode="numeric" placeholder="${ex.minReps}-${ex.maxReps}" value="${s.reps}"
+                oninput="updateSet('${ex.id}', ${slot.idx}, 'reps', this.value)" />
+              <span class="input-unit">reps</span>
+            </div>
+            <button type="button" id="chk_${ex.id}_${slot.idx}"
+              class="check-btn ${s.done ? "done" : ""}"
+              onclick="toggleDone('${ex.id}', ${slot.idx})"
+              title="Concluir ${slot.label}">✓</button>
           </div>
-          <div class="input-wrap">
-            <input type="number" inputmode="numeric" placeholder="${ex.minReps}-${ex.maxReps}" value="${s.reps}"
-              oninput="updateSet('${ex.id}', ${i}, 'reps', this.value)" />
-            <span class="input-unit">reps</span>
-          </div>
-          <button class="check-btn ${s.done ? "done" : ""}" onclick="toggleDone('${ex.id}', ${i})" title="Concluir série">✓</button>
         </div>
       `;
-    }
+    }).join("");
 
     card.innerHTML = `
       <div class="ex-top">
@@ -697,12 +773,13 @@ function renderExercises() {
           <div class="ex-meta">
             <span class="badge">${ex.muscle}</span>
             <span class="badge">${effectiveSets}x ${ex.minReps}–${ex.maxReps} reps</span>
-            ${canProgress ? `<span class="badge progress-up">Subir carga!</span>` : ""}
+            <span id="prog_${ex.id}" class="badge progress-up" style="display:${canProgress ? "inline-block" : "none"};">Subir carga!</span>
           </div>
         </div>
       </div>
       <p class="ex-note">${ex.note}</p>
-      <div class="sets-grid">${setsHtml}</div>
+      <div class="rd-tabs">${tabsHtml}</div>
+      ${panelsHtml}
     `;
     list.appendChild(card);
   });
@@ -714,12 +791,11 @@ function saveWorkoutLog() {
   const summaryLines = [];
 
   day.exercises.forEach(ex => {
-    const effectiveSets = (state.trim60 && ex.trimmable) ? Math.max(2, ex.sets - 1) : ex.sets;
     const setsText = [];
-    for (let i = 0; i < effectiveSets; i++) {
-      const s = getSetData(ex.id, i);
-      if (s.kg || s.reps) setsText.push(`${s.kg || 0}kg x ${s.reps || 0}`);
-    }
+    [{ idx: 0, label: "R" }, { idx: 1, label: "D" }].forEach(slot => {
+      const s = getSetData(ex.id, slot.idx);
+      if (s.kg || s.reps) setsText.push(`${slot.label}: ${s.kg || 0}kg x ${s.reps || 0}`);
+    });
     if (setsText.length > 0) {
       summaryLines.push(`${ex.name}: ${setsText.join(" | ")}`);
     }
