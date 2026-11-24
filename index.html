@@ -225,45 +225,27 @@
     margin: 0 0 10px 0;
   }
 
-  /* Horizontal Sets Layout with R and D visible simultaneously */
+  /* Single Series Layout: 1 row for R and 1 row for D */
   .sets-grid {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-  }
-
-  .set-block {
-    background: rgba(255, 255, 255, 0.015);
-    border: 1px solid var(--border);
-    border-radius: 9px;
-    padding: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .set-block-title {
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
+    gap: 7px;
   }
 
   .set-row {
     display: grid;
-    grid-template-columns: 28px 1fr 1fr 38px;
+    grid-template-columns: 32px 1fr 1fr 38px;
     gap: 6px;
     align-items: center;
   }
 
   .rd-badge {
-    height: 34px;
-    border-radius: 7px;
+    height: 36px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.8rem;
+    font-size: 0.82rem;
     font-weight: 800;
     border: 1px solid var(--border);
   }
@@ -292,8 +274,8 @@
     border: 1px solid var(--border);
     color: var(--text);
     border-radius: 8px;
-    padding: 7px 28px 7px 9px;
-    font-size: 0.88rem;
+    padding: 8px 30px 8px 10px;
+    font-size: 0.9rem;
     font-weight: 600;
     outline: none;
   }
@@ -311,7 +293,7 @@
   }
 
   .check-btn {
-    height: 34px;
+    height: 36px;
     width: 38px;
     border-radius: 8px;
     border: 1px solid var(--border);
@@ -603,7 +585,7 @@ const WEEKLY_SUMMARY = [
   { group: "Abdômen", sets: "6 séries diretas", detail: "Seg e Sex + estabilização geral" }
 ];
 
-const STORAGE_KEY = "hipertrofia_5d_state_v5";
+const STORAGE_KEY = "hipertrofia_5d_state_v6";
 let state = loadState();
 
 function createEmptySlot() {
@@ -614,14 +596,30 @@ function loadState() {
   try {
     const raw =
       localStorage.getItem(STORAGE_KEY) ||
-      localStorage.getItem("hipertrofia_5d_state_v4") ||
-      localStorage.getItem("hipertrofia_5d_state_v3") ||
-      localStorage.getItem("hipertrofia_5d_state_v2");
+      localStorage.getItem("hipertrofia_5d_state_v5") ||
+      localStorage.getItem("hipertrofia_5d_state_v4");
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (!parsed.weights) parsed.weights = {};
-      if (!parsed.history) parsed.history = [];
-      return parsed;
+      const migratedWeights = {};
+      if (parsed.weights) {
+        Object.keys(parsed.weights).forEach(exId => {
+          const entry = parsed.weights[exId];
+          if (entry && entry.R && entry.D) {
+            migratedWeights[exId] = entry;
+          } else if (entry && entry[0] && (entry[0].R || entry[0].D)) {
+            migratedWeights[exId] = {
+              R: entry[0].R || createEmptySlot(),
+              D: entry[0].D || createEmptySlot()
+            };
+          }
+        });
+      }
+      return {
+        activeDay: parsed.activeDay || "seg",
+        trim60: !!parsed.trim60,
+        weights: migratedWeights,
+        history: Array.isArray(parsed.history) ? parsed.history : []
+      };
     }
   } catch (e) {}
   return {
@@ -675,48 +673,41 @@ function toggleTrimMode() {
   showToast(state.trim60 ? "Modo 60 min ativado (-1 série nos acessórios)" : "Volume padrão restaurado");
 }
 
-function getSetSlotData(exId, setIdx, rdKey) {
-  if (!state.weights[exId]) state.weights[exId] = {};
-  if (!state.weights[exId][setIdx]) {
-    state.weights[exId][setIdx] = { R: createEmptySlot(), D: createEmptySlot() };
+function getSlotData(exId, rdKey) {
+  if (!state.weights[exId] || !state.weights[exId].R || !state.weights[exId].D) {
+    state.weights[exId] = { R: createEmptySlot(), D: createEmptySlot() };
   }
-  if (!state.weights[exId][setIdx][rdKey]) {
-    state.weights[exId][setIdx][rdKey] = createEmptySlot();
-  }
-  return state.weights[exId][setIdx][rdKey];
+  return state.weights[exId][rdKey];
 }
 
-function checkReadyToProgress(ex, effectiveSets) {
-  for (let i = 0; i < effectiveSets; i++) {
-    const sR = getSetSlotData(ex.id, i, "R");
-    const r = parseInt(sR.reps, 10);
-    if (isNaN(r) || r < ex.maxReps) return false;
-  }
-  return effectiveSets > 0;
+function checkReadyToProgress(ex) {
+  const sR = getSlotData(ex.id, "R");
+  const r = parseInt(sR.reps, 10);
+  return !isNaN(r) && r >= ex.maxReps;
 }
 
-function updateProgressBadge(ex, effectiveSets) {
+function updateProgressBadge(ex) {
   const badgeEl = document.getElementById(`prog_${ex.id}`);
   if (!badgeEl) return;
-  badgeEl.style.display = checkReadyToProgress(ex, effectiveSets) ? "inline-block" : "none";
+  badgeEl.style.display = checkReadyToProgress(ex) ? "inline-block" : "none";
 }
 
-function updateSet(exId, setIdx, rdKey, field, value, effectiveSets) {
-  const item = getSetSlotData(exId, setIdx, rdKey);
+function updateSlot(exId, rdKey, field, value) {
+  const item = getSlotData(exId, rdKey);
   item[field] = value;
   saveState();
   if (field === "reps") {
     const day = WORKOUT_DATA[state.activeDay];
     const ex = day.exercises.find(e => e.id === exId);
-    if (ex) updateProgressBadge(ex, effectiveSets);
+    if (ex) updateProgressBadge(ex);
   }
 }
 
-function toggleDone(exId, setIdx, rdKey) {
-  const item = getSetSlotData(exId, setIdx, rdKey);
+function toggleDone(exId, rdKey) {
+  const item = getSlotData(exId, rdKey);
   item.done = !item.done;
   saveState();
-  const btn = document.getElementById(`chk_${exId}_${setIdx}_${rdKey}`);
+  const btn = document.getElementById(`chk_${exId}_${rdKey}`);
   if (btn) {
     btn.classList.toggle("done", item.done);
   }
@@ -736,57 +727,12 @@ function renderExercises() {
 
   day.exercises.forEach(ex => {
     const effectiveSets = (state.trim60 && ex.trimmable) ? Math.max(2, ex.sets - 1) : ex.sets;
-    const canProgress = checkReadyToProgress(ex, effectiveSets);
+    const canProgress = checkReadyToProgress(ex);
+    const sR = getSlotData(ex.id, "R");
+    const sD = getSlotData(ex.id, "D");
 
     const card = document.createElement("div");
     card.className = "exercise-card";
-
-    let setsHtml = "";
-    for (let i = 0; i < effectiveSets; i++) {
-      const sR = getSetSlotData(ex.id, i, "R");
-      const sD = getSetSlotData(ex.id, i, "D");
-
-      setsHtml += `
-        <div class="set-block">
-          <div class="set-block-title">Série ${i + 1}</div>
-          <div class="set-row">
-            <div class="rd-badge r-tag">R</div>
-            <div class="input-wrap">
-              <input type="number" inputmode="decimal" step="0.5" placeholder="0" value="${sR.kg}"
-                oninput="updateSet('${ex.id}', ${i}, 'R', 'kg', this.value, ${effectiveSets})" />
-              <span class="input-unit">kg</span>
-            </div>
-            <div class="input-wrap">
-              <input type="number" inputmode="numeric" placeholder="${ex.minReps}-${ex.maxReps}" value="${sR.reps}"
-                oninput="updateSet('${ex.id}', ${i}, 'R', 'reps', this.value, ${effectiveSets})" />
-              <span class="input-unit">reps</span>
-            </div>
-            <button type="button" id="chk_${ex.id}_${i}_R"
-              class="check-btn ${sR.done ? "done" : ""}"
-              onclick="toggleDone('${ex.id}', ${i}, 'R')"
-              title="Concluir R">✓</button>
-          </div>
-
-          <div class="set-row">
-            <div class="rd-badge d-tag">D</div>
-            <div class="input-wrap">
-              <input type="number" inputmode="decimal" step="0.5" placeholder="0" value="${sD.kg}"
-                oninput="updateSet('${ex.id}', ${i}, 'D', 'kg', this.value, ${effectiveSets})" />
-              <span class="input-unit">kg</span>
-            </div>
-            <div class="input-wrap">
-              <input type="number" inputmode="numeric" placeholder="${ex.minReps}-${ex.maxReps}" value="${sD.reps}"
-                oninput="updateSet('${ex.id}', ${i}, 'D', 'reps', this.value, ${effectiveSets})" />
-              <span class="input-unit">reps</span>
-            </div>
-            <button type="button" id="chk_${ex.id}_${i}_D"
-              class="check-btn ${sD.done ? "done" : ""}"
-              onclick="toggleDone('${ex.id}', ${i}, 'D')"
-              title="Concluir D">✓</button>
-          </div>
-        </div>
-      `;
-    }
 
     card.innerHTML = `
       <div class="ex-top">
@@ -800,7 +746,43 @@ function renderExercises() {
         </div>
       </div>
       <p class="ex-note">${ex.note}</p>
-      <div class="sets-grid">${setsHtml}</div>
+      <div class="sets-grid">
+        <div class="set-row">
+          <div class="rd-badge r-tag">R</div>
+          <div class="input-wrap">
+            <input type="number" inputmode="decimal" step="0.5" placeholder="0" value="${sR.kg}"
+              oninput="updateSlot('${ex.id}', 'R', 'kg', this.value)" />
+            <span class="input-unit">kg</span>
+          </div>
+          <div class="input-wrap">
+            <input type="number" inputmode="numeric" placeholder="${ex.minReps}-${ex.maxReps}" value="${sR.reps}"
+              oninput="updateSlot('${ex.id}', 'R', 'reps', this.value)" />
+            <span class="input-unit">reps</span>
+          </div>
+          <button type="button" id="chk_${ex.id}_R"
+            class="check-btn ${sR.done ? "done" : ""}"
+            onclick="toggleDone('${ex.id}', 'R')"
+            title="Concluir R">✓</button>
+        </div>
+
+        <div class="set-row">
+          <div class="rd-badge d-tag">D</div>
+          <div class="input-wrap">
+            <input type="number" inputmode="decimal" step="0.5" placeholder="0" value="${sD.kg}"
+              oninput="updateSlot('${ex.id}', 'D', 'kg', this.value)" />
+            <span class="input-unit">kg</span>
+          </div>
+          <div class="input-wrap">
+            <input type="number" inputmode="numeric" placeholder="${ex.minReps}-${ex.maxReps}" value="${sD.reps}"
+              oninput="updateSlot('${ex.id}', 'D', 'reps', this.value)" />
+            <span class="input-unit">reps</span>
+          </div>
+          <button type="button" id="chk_${ex.id}_D"
+            class="check-btn ${sD.done ? "done" : ""}"
+            onclick="toggleDone('${ex.id}', 'D')"
+            title="Concluir D">✓</button>
+        </div>
+      </div>
     `;
     list.appendChild(card);
   });
@@ -812,18 +794,13 @@ function saveWorkoutLog() {
   const summaryLines = [];
 
   day.exercises.forEach(ex => {
-    const effectiveSets = (state.trim60 && ex.trimmable) ? Math.max(2, ex.sets - 1) : ex.sets;
-    const setsText = [];
-    for (let i = 0; i < effectiveSets; i++) {
-      const sR = getSetSlotData(ex.id, i, "R");
-      const sD = getSetSlotData(ex.id, i, "D");
-      const parts = [];
-      if (sR.kg || sR.reps) parts.push(`R: ${sR.kg || 0}kg x ${sR.reps || 0}`);
-      if (sD.kg || sD.reps) parts.push(`D: ${sD.kg || 0}kg x ${sD.reps || 0}`);
-      if (parts.length > 0) setsText.push(`S${i + 1} (${parts.join(", ")})`);
-    }
-    if (setsText.length > 0) {
-      summaryLines.push(`${ex.name}: ${setsText.join(" | ")}`);
+    const sR = getSlotData(ex.id, "R");
+    const sD = getSlotData(ex.id, "D");
+    const parts = [];
+    if (sR.kg || sR.reps) parts.push(`R: ${sR.kg || 0}kg x ${sR.reps || 0}`);
+    if (sD.kg || sD.reps) parts.push(`D: ${sD.kg || 0}kg x ${sD.reps || 0}`);
+    if (parts.length > 0) {
+      summaryLines.push(`${ex.name}: ${parts.join(" | ")}`);
     }
   });
 
@@ -846,12 +823,8 @@ function clearChecks() {
   const day = WORKOUT_DATA[state.activeDay];
   day.exercises.forEach(ex => {
     if (state.weights[ex.id]) {
-      Object.values(state.weights[ex.id]).forEach(setObj => {
-        if (setObj) {
-          if (setObj.R) setObj.R.done = false;
-          if (setObj.D) setObj.D.done = false;
-        }
-      });
+      if (state.weights[ex.id].R) state.weights[ex.id].R.done = false;
+      if (state.weights[ex.id].D) state.weights[ex.id].D.done = false;
     }
   });
   saveState();
