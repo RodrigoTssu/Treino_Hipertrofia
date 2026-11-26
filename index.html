@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>Treino Hipertrofia 5 Dias</title>
+<title>Treino Hipertrofia 5 Dias (Seg–Sex)</title>
 <style>
   :root {
     --bg: #0f1115;
@@ -18,6 +18,8 @@
     --green-soft: rgba(16, 185, 129, 0.16);
     --amber: #f59e0b;
     --amber-soft: rgba(245, 158, 11, 0.16);
+    --purple: #a855f7;
+    --purple-soft: rgba(168, 85, 247, 0.16);
     --danger: #ef4444;
     --radius: 12px;
   }
@@ -105,7 +107,7 @@
 
   .day-pill {
     flex: 1;
-    min-width: 62px;
+    min-width: 58px;
     background: var(--surface);
     color: var(--muted);
     border: 1px solid var(--border);
@@ -225,7 +227,7 @@
     margin: 0 0 10px 0;
   }
 
-  /* Single Series Layout: 1 row for R and 1 row for D */
+  /* Single Series Layout: 1 row for R, 1 row for D, 1 row for T */
   .sets-grid {
     display: flex;
     flex-direction: column;
@@ -260,6 +262,12 @@
     background: var(--amber-soft);
     border-color: rgba(245, 158, 11, 0.45);
     color: #fcd34d;
+  }
+
+  .rd-badge.t-tag {
+    background: var(--purple-soft);
+    border-color: rgba(168, 85, 247, 0.45);
+    color: #d8b4fe;
   }
 
   .input-wrap {
@@ -483,7 +491,7 @@
         <button class="close-btn" onclick="closeModal('summaryModal')">Fechar</button>
       </div>
       <p style="font-size:0.82rem; color:var(--muted); margin-top:0;">
-        Séries válidas diretas planejadas na semana (0–2 RIR), além do estímulo indireto dos compostos:
+        Séries válidas diretas planejadas de segunda a sexta (0–2 RIR), além do estímulo indireto dos compostos:
       </p>
       <div class="volume-list" id="volumeGrid"></div>
     </div>
@@ -535,9 +543,9 @@ const WORKOUT_DATA = {
       { id: "ter_5", name: "Rosca Inversa + Rosca Punho", muscle: "Antebraço", sets: 3, minReps: 12, maxReps: 15, trimmable: true, note: "Controle total na fase excêntrica." }
     ]
   },
-  qui: {
-    short: "Qui",
-    title: "Quinta — Upper B",
+  qua: {
+    short: "Qua",
+    title: "Quarta — Upper B",
     subtitle: "Foco: Ombro, Costas, Peito e Trapézio",
     exercises: [
       { id: "qui_1", name: "Desenvolvimento com Halteres ou Máquina", muscle: "Ombro / Tríceps", sets: 3, minReps: 6, maxReps: 10, trimmable: false, note: "Composto principal de ombro (1–2 RIR)." },
@@ -547,9 +555,9 @@ const WORKOUT_DATA = {
       { id: "qui_5", name: "Crucifixo Inverso (Voador Invertido)", muscle: "Ombro Posterior", sets: 3, minReps: 12, maxReps: 15, trimmable: true, note: "Mantenha punhos neutros e foco no deltoide posterior." }
     ]
   },
-  sex: {
-    short: "Sex",
-    title: "Sexta — Lower B + Braços/Abdômen",
+  qui: {
+    short: "Qui",
+    title: "Quinta — Lower B + Braços/Abdômen",
     subtitle: "Foco: Posterior de Coxa, Tríceps, Bíceps e Abdômen",
     exercises: [
       { id: "sex_1", name: "Terra Romeno (RDL) ou Mesa Flexora", muscle: "Perna (Posterior)", sets: 3, minReps: 8, maxReps: 12, trimmable: false, note: "Alongamento profundo dos isquiotibiais (1–2 RIR)." },
@@ -559,9 +567,9 @@ const WORKOUT_DATA = {
       { id: "sex_5", name: "Abdominal Supra no Cabo ou Prancha RKC", muscle: "Abdômen", sets: 3, minReps: 12, maxReps: 15, trimmable: true, note: "Contração abdominal máxima sem puxar com os braços." }
     ]
   },
-  sab: {
-    short: "Sáb",
-    title: "Sábado — Híbrido Tronco Superior",
+  sex: {
+    short: "Sex",
+    title: "Sexta — Híbrido Tronco Superior",
     subtitle: "Foco: Refinamento Peito, Costas, Ombro, Tríceps e Panturrilha",
     exercises: [
       { id: "sab_1", name: "Supino Inclinado Halteres ou Paralelas", muscle: "Peito / Tríceps", sets: 3, minReps: 8, maxReps: 12, trimmable: false, note: "Segundo estímulo de empurrar na semana." },
@@ -573,19 +581,19 @@ const WORKOUT_DATA = {
 };
 
 const WEEKLY_SUMMARY = [
-  { group: "Peito", sets: "9 séries diretas", detail: "Seg, Qui e Sáb (+ indireto em Desenv.)" },
-  { group: "Costas", sets: "9 séries diretas", detail: "Seg (2x), Qui e Sáb" },
-  { group: "Ombro", sets: "12 séries diretas", detail: "Seg, Qui (2x) e Sáb" },
-  { group: "Trapézio", sets: "3 séries diretas", detail: "Qui + estímulo forte em remadas/RDL" },
-  { group: "Bíceps", sets: "6 séries diretas", detail: "Ter e Sex + estímulo em puxadas" },
-  { group: "Tríceps", sets: "6 séries diretas", detail: "Sex e Sáb + estímulo em supinos" },
-  { group: "Antebraço", sets: "6 séries diretas", detail: "Ter e Sáb + pegada nos compostos" },
-  { group: "Perna (Quad + Post)", sets: "12 séries diretas", detail: "Ter (6 séries) e Sex (6 séries)" },
-  { group: "Panturrilha", sets: "7 séries diretas", detail: "Ter (4 séries) e Sáb (3 séries)" },
-  { group: "Abdômen", sets: "6 séries diretas", detail: "Seg e Sex + estabilização geral" }
+  { group: "Peito", sets: "9 séries diretas", detail: "Seg, Qua e Sex (+ indireto em Desenv.)" },
+  { group: "Costas", sets: "9 séries diretas", detail: "Seg (2x), Qua e Sex" },
+  { group: "Ombro", sets: "12 séries diretas", detail: "Seg, Qua (2x) e Sex" },
+  { group: "Trapézio", sets: "3 séries diretas", detail: "Qua + estímulo forte em remadas/RDL" },
+  { group: "Bíceps", sets: "6 séries diretas", detail: "Ter e Qui + estímulo em puxadas" },
+  { group: "Tríceps", sets: "6 séries diretas", detail: "Qui e Sex + estímulo em supinos" },
+  { group: "Antebraço", sets: "6 séries diretas", detail: "Ter e Sex + pegada nos compostos" },
+  { group: "Perna (Quad + Post)", sets: "12 séries diretas", detail: "Ter (6 séries) e Qui (6 séries)" },
+  { group: "Panturrilha", sets: "7 séries diretas", detail: "Ter (4 séries) e Sex (3 séries)" },
+  { group: "Abdômen", sets: "6 séries diretas", detail: "Seg e Qui + estabilização geral" }
 ];
 
-const STORAGE_KEY = "hipertrofia_5d_state_v6";
+const STORAGE_KEY = "hipertrofia_5d_state_v7";
 let state = loadState();
 
 function createEmptySlot() {
@@ -596,6 +604,7 @@ function loadState() {
   try {
     const raw =
       localStorage.getItem(STORAGE_KEY) ||
+      localStorage.getItem("hipertrofia_5d_state_v6") ||
       localStorage.getItem("hipertrofia_5d_state_v5") ||
       localStorage.getItem("hipertrofia_5d_state_v4");
     if (raw) {
@@ -604,18 +613,25 @@ function loadState() {
       if (parsed.weights) {
         Object.keys(parsed.weights).forEach(exId => {
           const entry = parsed.weights[exId];
-          if (entry && entry.R && entry.D) {
-            migratedWeights[exId] = entry;
-          } else if (entry && entry[0] && (entry[0].R || entry[0].D)) {
+          if (entry && (entry.R || entry.D || entry.T)) {
+            migratedWeights[exId] = {
+              R: entry.R || createEmptySlot(),
+              D: entry.D || createEmptySlot(),
+              T: entry.T || createEmptySlot()
+            };
+          } else if (entry && entry[0] && (entry[0].R || entry[0].D || entry[0].T)) {
             migratedWeights[exId] = {
               R: entry[0].R || createEmptySlot(),
-              D: entry[0].D || createEmptySlot()
+              D: entry[0].D || createEmptySlot(),
+              T: entry[0].T || createEmptySlot()
             };
           }
         });
       }
+      const validDays = Object.keys(WORKOUT_DATA);
+      const safeDay = validDays.includes(parsed.activeDay) ? parsed.activeDay : "seg";
       return {
-        activeDay: parsed.activeDay || "seg",
+        activeDay: safeDay,
         trim60: !!parsed.trim60,
         weights: migratedWeights,
         history: Array.isArray(parsed.history) ? parsed.history : []
@@ -674,8 +690,11 @@ function toggleTrimMode() {
 }
 
 function getSlotData(exId, rdKey) {
-  if (!state.weights[exId] || !state.weights[exId].R || !state.weights[exId].D) {
-    state.weights[exId] = { R: createEmptySlot(), D: createEmptySlot() };
+  if (!state.weights[exId]) {
+    state.weights[exId] = { R: createEmptySlot(), D: createEmptySlot(), T: createEmptySlot() };
+  }
+  if (!state.weights[exId][rdKey]) {
+    state.weights[exId][rdKey] = createEmptySlot();
   }
   return state.weights[exId][rdKey];
 }
@@ -713,8 +732,31 @@ function toggleDone(exId, rdKey) {
   }
 }
 
+function renderSlotRow(ex, slotKey, tagClass) {
+  const s = getSlotData(ex.id, slotKey);
+  return `
+    <div class="set-row">
+      <div class="rd-badge ${tagClass}">${slotKey}</div>
+      <div class="input-wrap">
+        <input type="number" inputmode="decimal" step="0.5" placeholder="0" value="${s.kg}"
+          oninput="updateSlot('${ex.id}', '${slotKey}', 'kg', this.value)" />
+        <span class="input-unit">kg</span>
+      </div>
+      <div class="input-wrap">
+        <input type="number" inputmode="numeric" placeholder="${ex.minReps}-${ex.maxReps}" value="${s.reps}"
+          oninput="updateSlot('${ex.id}', '${slotKey}', 'reps', this.value)" />
+        <span class="input-unit">reps</span>
+      </div>
+      <button type="button" id="chk_${ex.id}_${slotKey}"
+        class="check-btn ${s.done ? "done" : ""}"
+        onclick="toggleDone('${ex.id}', '${slotKey}')"
+        title="Concluir ${slotKey}">✓</button>
+    </div>
+  `;
+}
+
 function renderExercises() {
-  const day = WORKOUT_DATA[state.activeDay];
+  const day = WORKOUT_DATA[state.activeDay] || WORKOUT_DATA.seg;
   document.getElementById("dayTitle").textContent = day.title;
   document.getElementById("daySubtitle").textContent = day.subtitle;
 
@@ -728,8 +770,6 @@ function renderExercises() {
   day.exercises.forEach(ex => {
     const effectiveSets = (state.trim60 && ex.trimmable) ? Math.max(2, ex.sets - 1) : ex.sets;
     const canProgress = checkReadyToProgress(ex);
-    const sR = getSlotData(ex.id, "R");
-    const sD = getSlotData(ex.id, "D");
 
     const card = document.createElement("div");
     card.className = "exercise-card";
@@ -747,41 +787,9 @@ function renderExercises() {
       </div>
       <p class="ex-note">${ex.note}</p>
       <div class="sets-grid">
-        <div class="set-row">
-          <div class="rd-badge r-tag">R</div>
-          <div class="input-wrap">
-            <input type="number" inputmode="decimal" step="0.5" placeholder="0" value="${sR.kg}"
-              oninput="updateSlot('${ex.id}', 'R', 'kg', this.value)" />
-            <span class="input-unit">kg</span>
-          </div>
-          <div class="input-wrap">
-            <input type="number" inputmode="numeric" placeholder="${ex.minReps}-${ex.maxReps}" value="${sR.reps}"
-              oninput="updateSlot('${ex.id}', 'R', 'reps', this.value)" />
-            <span class="input-unit">reps</span>
-          </div>
-          <button type="button" id="chk_${ex.id}_R"
-            class="check-btn ${sR.done ? "done" : ""}"
-            onclick="toggleDone('${ex.id}', 'R')"
-            title="Concluir R">✓</button>
-        </div>
-
-        <div class="set-row">
-          <div class="rd-badge d-tag">D</div>
-          <div class="input-wrap">
-            <input type="number" inputmode="decimal" step="0.5" placeholder="0" value="${sD.kg}"
-              oninput="updateSlot('${ex.id}', 'D', 'kg', this.value)" />
-            <span class="input-unit">kg</span>
-          </div>
-          <div class="input-wrap">
-            <input type="number" inputmode="numeric" placeholder="${ex.minReps}-${ex.maxReps}" value="${sD.reps}"
-              oninput="updateSlot('${ex.id}', 'D', 'reps', this.value)" />
-            <span class="input-unit">reps</span>
-          </div>
-          <button type="button" id="chk_${ex.id}_D"
-            class="check-btn ${sD.done ? "done" : ""}"
-            onclick="toggleDone('${ex.id}', 'D')"
-            title="Concluir D">✓</button>
-        </div>
+        ${renderSlotRow(ex, "R", "r-tag")}
+        ${renderSlotRow(ex, "D", "d-tag")}
+        ${renderSlotRow(ex, "T", "t-tag")}
       </div>
     `;
     list.appendChild(card);
@@ -794,11 +802,11 @@ function saveWorkoutLog() {
   const summaryLines = [];
 
   day.exercises.forEach(ex => {
-    const sR = getSlotData(ex.id, "R");
-    const sD = getSlotData(ex.id, "D");
     const parts = [];
-    if (sR.kg || sR.reps) parts.push(`R: ${sR.kg || 0}kg x ${sR.reps || 0}`);
-    if (sD.kg || sD.reps) parts.push(`D: ${sD.kg || 0}kg x ${sD.reps || 0}`);
+    ["R", "D", "T"].forEach(k => {
+      const s = getSlotData(ex.id, k);
+      if (s.kg || s.reps) parts.push(`${k}: ${s.kg || 0}kg x ${s.reps || 0}`);
+    });
     if (parts.length > 0) {
       summaryLines.push(`${ex.name}: ${parts.join(" | ")}`);
     }
@@ -823,8 +831,9 @@ function clearChecks() {
   const day = WORKOUT_DATA[state.activeDay];
   day.exercises.forEach(ex => {
     if (state.weights[ex.id]) {
-      if (state.weights[ex.id].R) state.weights[ex.id].R.done = false;
-      if (state.weights[ex.id].D) state.weights[ex.id].D.done = false;
+      ["R", "D", "T"].forEach(k => {
+        if (state.weights[ex.id][k]) state.weights[ex.id][k].done = false;
+      });
     }
   });
   saveState();
